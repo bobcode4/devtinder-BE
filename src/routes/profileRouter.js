@@ -2,6 +2,7 @@ const express = require('express');
 const { userAuth } = require("../middlewares/auth");
 const profileRouter = express.Router();
 const User = require("../models/user");
+const { validateEditProfileData } = require("../utils/validation")
 
 profileRouter.get('/profile', userAuth, async (req, res) => {
     try {
@@ -25,23 +26,26 @@ profileRouter.delete('/user', async (req,res) => {
     }
 })
 
-profileRouter.patch('/user', async (req,res) => {
-    const data = req.body;
-    const {userId, skills} = data;
-    
-    const ALLOWED_FIELDS = [
-        "skills", "about", "age", "userId"
-    ]
-    const isAllowed = Object.keys(data).every((key)=> ALLOWED_FIELDS.includes(key));
-    
-    const user = await User.findByIdAndUpdate(userId, {skills : skills}, {returnDocument : 'after'});
-
+profileRouter.patch('/profile/edit', userAuth, async (req,res) => {
     try{
-        if(!user) res.send("No user found with the given id")
-        else if(!isAllowed) res.send("Update not allowed")
-        else res.send(`updated user : ${user}\n user updated successfully`)
+        if(!validateEditProfileData(req.body)){
+            throw new Error("Edit Not Allowed")
+        }
+
+        const loggedInUser = req.user;
+        Object.keys(req.body).forEach((key) => (loggedInUser[key] = req.body[key]));
+
+        await loggedInUser.save();
+        res.json({
+            "message" : `${loggedInUser.firstName}, Your profile updated successfuly`,
+            "updatedData" : loggedInUser
+        }
+        )
+        res.send();
+
+
     } catch(err) {
-        res.status(400).send("something went wrong " + err.message)
+        res.status(400).send("ERROR : "+ err.message)
     }
 }) 
 
